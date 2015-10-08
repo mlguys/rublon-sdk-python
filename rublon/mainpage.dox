@@ -1,0 +1,62 @@
+/*! \mainpage Integration Guide
+ *
+ * \section intro_sec Introduction
+ *
+ * This SDK allows you to easily incorporate Rublon functionalities into your existing Python project. <br>It's compatible with Python in versions 2.6 - 3.5, and depends on PyCurl package. It's not framework-specific solution.
+ *
+ * \section install_sec Installation
+ * To install it, simply invoke<pre>pip install .</pre> in a main directory, with setup.py file. From now on, you should be able to <i>import rublon</i> in Python shell.
+ *
+ * \section simple_integration_sec Simple Integration
+ *
+ * \subsection si_introdution_subsec Introduction
+ * Basic use of Rublon is to provide clients with 2-factor account authentication, that is convenient to use for end-user, simple to implement and secure. In this example we'll secure our authentication system with Rublon with the help of \ref Rublon2Factor class. Full source code is available in example/flask_simple.py file and is built with <a href="http://flask.pocoo.org/">Flask web framework</a>. Example for Django is also available under example-django.<br>Integration will result in a following process:<ol><li>User successfully authenticates with his credentials in your system</li><li>You call Rublon2Factor auth method and redirect user to URL returned by it</li><li>User authenticates using Rublon and is being redirected back to your site's URL that you specified using \ref Rublon2Factor::auth auth method</li><li>API response is being parsed on your page using \ref Rublon2FactorCallback and if everything is ok, you redirect the user to secured area</li><li>Rublon widgets can be used there</li></ol>
+ *
+ * \subsection step1 Step 1: Import required classes
+ * <pre>from rublon import Rublon2Factor, Rublon2FactorCallback, Rublon2FactorGUI</pre>
+ * \subsection step2 Step 2: Write hook for authentication process
+ * <pre>RUBLON_SYSTEM_TOKEN = 'your_system_token'
+RUBLON_SECRET_KEY = 'your_secret_key'
+callback_url = callback_url = request.url_root + 'rublon_callback/' //1
+user_email = 'user@example.com' //2
+user_id = user_email //3
+extra_params = {} //4
+
+rublon = Rublon2Factor(RUBLON_SYSTEM_TOKEN, RUBLON_SECRET_KEY)
+url = rublon.auth(callback_url, user_id, user_email, extra_params)
+return redirect(url) // 5</pre> <ol><li>Instruct Rublon to redirect user to the same page with additional GET param rublon = callback</li><li>Email address of user - it we'll be used to associate them with Rublon account</li><li>Unique id of user in your system - for the purpose of this tutorial this can be simply email</li><li>Optional extra parameters - needless right now</li><li>Redirect the user's browser to the Rublon's server to authenticate by Rublon:</li></ol>
+ * SYSTEM_TOKEN and SECRET_KEY can be obtained in <a href="https://developers.rublon.com/">Rublon Developer Area</a>.
+ * \subsection step3 Step 3: Write handler for callback
+ * As a prerequisite we need to subclass Rublon2FactorCallback as getting query and post params is not cross-framework in Python and therefore it might need adaptation, there are three abstract methods to override:
+ * <pre>class Rublon2FactorCallbackFlask(Rublon2FactorCallback):
+    def get_raw_request_body(self):
+        return request.get_data()
+
+    def get_state(self):
+        return request.args.get(self.PARAMETER_STATE)
+
+    def get_access_token(self):
+        return request.args.get(self.PARAMETER_ACCESS_TOKEN)</pre> As you can see it's fairly simple in Flask.
+ * <pre>rublon = Rublon2Factor(RUBLON_SYSTEM_TOKEN, RUBLON_SECRET_KEY)
+callback = Rublon2FactorCallbackFlask(rublon)
+callback.call(success_handler=rublon_user_logged_in_callback,
+              cancel_handler=rublon_cancel_callback)
+return redirect(request.url_root) //2
+
+def rublon_user_logged_in_callback(user_id, callback):
+    session['user_id'] = user_id //1
+
+def rublon_cancel_callback(callback):
+    raise Exception('Request cancelled')</pre>
+<ol><li>This piece of code is to finalize our auth process. We are using the user's email instead a numeric ID</li><li>If everything is ok, redirect to the secured area (main page in this case)</li></ol>
+ * \subsection step4 Step 4: Include RublonGUI widgets in secured area
+ * <pre>if 'user_id' in session:
+    rublon = Rublon2Factor(RUBLON_SYSTEM_TOKEN, RUBLON_SECRET_KEY)
+    return """You are logged in. {0} <a href="/logout">Logout</a>""".format(
+        Rublon2FactorGUI(rublon, user_id=session['user_id'], user_email=session['user_id'])
+    )</pre>
+ * \subsection concl Conclusion
+ * Full source code is available in example/flask_simple.py file. You can easily play around with it defining RUBLON_SYSTEM_TOKEN and RUBLON_SECRET_KEY, then running it: <pre>python flask_simple.py</pre> and visiting http://localhost:8000 in your browser.
+ * Just ensure that you have flask installed:<pre>pip install flask</pre>
+ */
+
